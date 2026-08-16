@@ -261,7 +261,7 @@ interval:
           const float V_knee    = id(yambms${yambms_id}_number_auto_ccl_ct_knee_v).state;       // knee voltage
           const float V_bulk    = id(yambms${yambms_id}_bulk_voltage).state;                    // bulk voltage
           // NEW: read the rebulk voltage from your number entity
-          const float V_rebulk  = id(yambms${yambms_id}_number_rebulk_v).state;                 // rebulk voltage (for deactivation)
+          const float V_rebulk  = id(yambms${yambms_id}_rebulk_v).state;                 // rebulk voltage (for deactivation)                 // rebulk voltage (for deactivation)
           // Prefer SMA pack V; fall back to raw until the filter has a sample
           const float V_pack    = id(yambms${yambms_id}_auto_ccl_ct_voltage).has_state()        // pack voltage
               ? id(yambms${yambms_id}_auto_ccl_ct_voltage).state
