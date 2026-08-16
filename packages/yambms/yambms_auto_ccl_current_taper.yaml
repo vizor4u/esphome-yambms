@@ -260,6 +260,8 @@ interval:
           const float I_balance = id(yambms${yambms_id}_number_auto_ccl_ct_balance_a).state;    // CCL while latched at bulk / EOC
           const float V_knee    = id(yambms${yambms_id}_number_auto_ccl_ct_knee_v).state;       // knee voltage
           const float V_bulk    = id(yambms${yambms_id}_bulk_voltage).state;                    // bulk voltage
+          // NEW: read the rebulk voltage from your number entity
+          const float V_rebulk  = id(yambms${yambms_id}_number_rebulk_v).state;                 // rebulk voltage (for deactivation)
           // Prefer SMA pack V; fall back to raw until the filter has a sample
           const float V_pack    = id(yambms${yambms_id}_auto_ccl_ct_voltage).has_state()        // pack voltage
               ? id(yambms${yambms_id}_auto_ccl_ct_voltage).state
@@ -275,7 +277,8 @@ interval:
           // Advance the pipeline turn regardless so a transient NaN can't stall the
           // whole Auto CCL baton.
           //--------------------------------------------------------------------
-          if (isnan(V_knee) || isnan(V_bulk) || isnan(V_pack)) {
+          // Also include V_rebulk in the NaN check
+          if (isnan(V_knee) || isnan(V_bulk) || isnan(V_pack) || isnan(V_rebulk)) {
             active = false;
             bulk_latched = false;
             id(yambms${yambms_id}_auto_ccl_ct_delta).publish_state(0.0f);
@@ -296,7 +299,7 @@ interval:
           }
 
           //--------------------------------------------------------------------
-          // Session: activate at knee; stay active until 0.2 V below knee
+          // Session: activate at knee; stay active until 0.2 V below REBULK (instead of knee)
           //--------------------------------------------------------------------
           if (!active && V_pack >= V_knee) {
             active = true;
@@ -307,7 +310,7 @@ interval:
                 ? id(yambms${yambms_id}_requested_charge_current).state
                 : I_max;
             I_anchor = fminf(I_knee, I_ccl);
-          } else if (active && V_pack <= (V_knee - V_hyst)) {
+          } else if (active && V_pack <= V_rebulk) {   // <--- CHANGED HERE
             active = false;
             bulk_latched = false;
           } else if (active && !bulk_latched && V_pack >= V_bulk) {
