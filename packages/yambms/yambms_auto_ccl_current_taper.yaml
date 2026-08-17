@@ -311,7 +311,7 @@ interval:
                 : I_max;
             I_anchor = fminf(I_knee, I_ccl);
            } else if (active && V_pack <= (V_knee - V_hyst)) {
-         # } else if (active && V_pack <= V_rebulk) {   // <--- CHANGED HERE
+       // } else if (active && V_pack <= V_rebulk) {   // <--- CHANGED HERE
             active = false;
             bulk_latched = false;
           } else if (active && !bulk_latched && V_pack >= V_bulk) {
