@@ -1,0 +1,207 @@
+# Updated : 2026.08.17
+# Version : 1.3.0
+# GitHub  : https://github.com/Sleeper85/esphome-yambms
+
+# YamBMS ( Yet another multi-BMS Merging Solution )
+
+# This YAML is free software: you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation, either version 3
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/gpl.html>.
+
+# Originally developed by @GHswitt
+# Adapted and reorganized to an interval lambda for the new CVL core by @Sleeper85
+# PID-like (hysteresis) Follow mode added by user request
+
+select:
+  - platform: template
+    name: "Automatic Float Voltage"
+    id: yambms${yambms_id}_auto_float_mode
+    device_id: yambms_yambms${yambms_id}
+    options:
+      - "Disabled"
+      - "Follow"
+      - "Immediately"
+    restore_value: true
+    initial_option: "Disabled"
+    optimistic: true
+    entity_category: config
+    set_action:
+      - logger.log:
+          format: "Auto Float chosen option: %s"
+          args: ["x.c_str()"]
+
+sensor:
+  # Auto Float Voltage
+  - platform: template
+    id: yambms${yambms_id}_auto_float_v
+    device_id: yambms_yambms${yambms_id}
+    name: "Auto Float Voltage"
+    update_interval: never
+    unit_of_measurement: V
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 1
+
+  # Auto Float Voltage Delta
+  - platform: template
+    id: yambms${yambms_id}_auto_float_v_delta
+    device_id: yambms_yambms${yambms_id}
+    name: "Auto Float Voltage Delta"
+    update_interval: never
+    unit_of_measurement: V
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 1
+
+  # Filter total voltage (max)
+  - platform: template
+    id: yambms${yambms_id}_auto_float_total_v
+    device_id: yambms_yambms${yambms_id}
+    update_interval: 30s
+    filters:
+      - max:
+          window_size: 4
+    lambda: return id(yambms${yambms_id}_total_voltage).state;
+
+number:
+  - platform: template
+    name: "Auto Float Voltage Step"
+    id: yambms${yambms_id}_auto_float_step_v
+    device_id: yambms_yambms${yambms_id}
+    step: 0.1
+    min_value: 0.1
+    max_value: 0.5
+    restore_value: true
+    mode: "${yambms_input_number_mode}"
+    initial_value: 0.1
+    unit_of_measurement: V
+    icon: mdi:sine-wave
+    optimistic: true
+    entity_category: config
+
+  - platform: template
+    name: "Auto Float Update Interval"
+    id: yambms${yambms_id}_auto_float_interval
+    device_id: yambms_yambms${yambms_id}
+    step: 1
+    min_value: 1
+    max_value: 10
+    restore_value: true
+    mode: "${yambms_input_number_mode}"
+    initial_value: 3
+    unit_of_measurement: min
+    icon: mdi:timer-sand
+    optimistic: true
+    entity_category: config
+
+  - platform: template
+    name: "Auto Float Max Correction"
+    id: yambms${yambms_id}_auto_float_max_correction
+    device_id: yambms_yambms${yambms_id}
+    step: 0.1
+    min_value: 0.1
+    max_value: 0.5
+    restore_value: true
+    mode: "${yambms_input_number_mode}"
+    initial_value: 0.3
+    unit_of_measurement: V
+    icon: mdi:arrow-collapse-down
+    optimistic: true
+    entity_category: config
+
+interval:
+  - interval: 60s  # Keep this at 60s, otherwise "Auto Float Update Interval" won't work!
+    then:
+      # +--------------------------------------+
+      # | Auto Float Voltage Control           |
+      # +--------------------------------------+
+      - lambda: |-
+          // Variables
+          const auto mode = id(yambms${yambms_id}_auto_float_mode).active_index();        // Mode: 0 - Disabled, 1 - Follow, 2 - Immediately
+          const float  bulk_v = id(yambms${yambms_id}_bulk_voltage).state;                // Bulk voltage
+          const float  target_float_v = id(yambms${yambms_id}_float_voltage).state;       // Target float voltage
+          const float  step_v = id(yambms${yambms_id}_auto_float_step_v).state;           // Voltage step for each correction
+          const float  max_total_v = id(yambms${yambms_id}_auto_float_total_v).state;     // Total voltage (mean and max)
+          const float  max_correction = id(yambms${yambms_id}_auto_float_max_correction).state; // Max correction below target float
+          const auto update_interval = id(yambms${yambms_id}_auto_float_interval).state;  // Update interval in minutes
+          static float  correction = 0.0;                                                 // Current correction (negative = below target)
+          static uint8_t time_count = 0;                                                  // Interval counter
+
+          // +----------------------------------------------------------+
+          // | Gate #1 : Auto Float disabled OR Bulk V. <= Float V.
+          // +----------------------------------------------------------+
+          if ((mode == 0) || (bulk_v <= target_float_v))
+          {
+            // Reset values
+            correction = 0.0;
+            time_count = 0;
+            id(yambms${yambms_id}_var_auto_float) = 0.0;
+            id(yambms${yambms_id}_auto_float_v).publish_state(target_float_v);
+            id(yambms${yambms_id}_auto_float_v_delta).publish_state(0.0);
+            return;
+          }
+
+          // +----------------------------------------------------------+
+          // | Gate #2 : Auto Float enabled + No Floating
+          // +----------------------------------------------------------+
+          if (id(yambms${yambms_id}_charging_instruction).state != "Float")
+          {
+            // Reset values
+            correction = 0.0;
+            time_count = 0;
+            id(yambms${yambms_id}_var_auto_float) = 0.0;
+            id(yambms${yambms_id}_auto_float_v).publish_state(target_float_v);
+            id(yambms${yambms_id}_auto_float_v_delta).publish_state(0.0);
+            return;
+          }
+
+          // +----------------------------------------------------------+
+          // | Auto Float Voltage Control
+          // +----------------------------------------------------------+
+          // Check update interval
+          if (++time_count >= (uint8_t)update_interval)
+          {
+            // Follow mode : PID-like hysteresis control
+            if (mode == 1)
+            {
+              // Battery is ABOVE target float -> inverter offset present, lower the effective float
+              if ((max_total_v > 0) && (max_total_v > target_float_v))
+              {
+                correction -= step_v;
+              }
+              // Battery is BELOW target float -> offset gone, raise back toward target
+              else if ((max_total_v > 0) && (max_total_v < target_float_v))
+              {
+                correction += step_v;
+              }
+            }
+            // Immediately mode : Start immediately (decrement toward target)
+            else if (mode == 2)
+            {
+              if (correction > -max_correction) correction -= step_v;
+            }
+
+            // Clamp correction to [-max_correction, 0]
+            if (correction < -max_correction) correction = -max_correction;
+            if (correction > 0.0) correction = 0.0;
+
+            // Reset update interval counter
+            time_count = 0;
+          }
+
+          // Round correction to 1 decimal
+          float auto_float_delta = roundf(correction * 10.0f) / 10.0f;
+          id(yambms${yambms_id}_var_auto_float) = auto_float_delta;
+
+          // Publish the sensors
+          id(yambms${yambms_id}_auto_float_v).publish_state(target_float_v + auto_float_delta);
+          id(yambms${yambms_id}_auto_float_v_delta).publish_state(auto_float_delta);
