@@ -24,11 +24,9 @@ packages:
   yambms_auto_1: !include yambms_auto_cvl.yaml
   yambms_auto_2: !include yambms_auto_ccl.yaml
   yambms_auto_3: !include yambms_auto_dcl.yaml
-#  yambms_auto_4: !include yambms_auto_float_pid.yaml
   yambms_auto_4: !include yambms_auto_float.yaml
   yambms_auto_5: !include yambms_auto_eoc.yaml
   yambms_auto_6: !include yambms_auto_temp_ccl_dcl.yaml
   yambms_auto_7: !include yambms_auto_soc_limit.yaml
-  yambms_auto_8: !include yambms_auto_ccl_current_taper.yaml
   # Update service
   yambms_service: !include yambms_service.yaml
