@@ -48,8 +48,8 @@ globals:
 sensor:
   # Shows the current target current being applied by the taper logic
   - platform: template
-    name: "YAMBMS ${yambms_id} Taper Applied Current"
-    id: yambms${yambms_id}_taper_applied_current
+    name: "YamBMS Taper Applied Current"
+    id: yambms1_taper_applied_current
     unit_of_measurement: "A"
     accuracy_decimals: 1
     update_interval: 3s
@@ -58,8 +58,8 @@ sensor:
 
   # Shows the original (user-set) charge current before tapering
   - platform: template
-    name: "YAMBMS ${yambms_id} Taper Original Current"
-    id: yambms${yambms_id}_taper_original_current
+    name: "YamBMS Taper Original Current"
+    id: yambms1_taper_original_current
     unit_of_measurement: "A"
     accuracy_decimals: 1
     update_interval: 3s
@@ -68,8 +68,8 @@ sensor:
 
   # Shows whether the taper is currently active (1 = active, 0 = inactive)
   - platform: template
-    name: "YAMBMS ${yambms_id} Taper Active"
-    id: yambms${yambms_id}_taper_active_sensor
+    name: "YamBMS Taper Active"
+    id: yambms1_taper_active_sensor
     unit_of_measurement: ""
     accuracy_decimals: 0
     update_interval: 3s
@@ -82,7 +82,7 @@ sensor:
 # ============================================================
 switch:
   - platform: template
-    name: "YAMBMS ${yambms_id} Charge Taper Enabled"
+    name: "YamBMS Charge Taper Enabled"
     id: yambms${yambms_id}_charge_taper_enabled
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
@@ -127,7 +127,7 @@ number:
 
   # Taper current 1 slider
   - platform: template
-    name: "YAMBMS ${yambms_id} Taper Current 1"
+    name: "YamBMS Taper Current 1"
     id: yambms${yambms_id}_taper_current_1
     unit_of_measurement: "A"
     min_value: 0
@@ -139,7 +139,7 @@ number:
 
   # Taper current 2 slider
   - platform: template
-    name: "YAMBMS ${yambms_id} Taper Current 2"
+    name: "YamBMS Taper Current 2"
     id: yambms${yambms_id}_taper_current_2
     unit_of_measurement: "A"
     min_value: 0
@@ -151,7 +151,7 @@ number:
 
   # Taper current 3 slider
   - platform: template
-    name: "YAMBMS ${yambms_id} Taper Current 3"
+    name: "YamBMS Taper Current 3"
     id: yambms${yambms_id}_taper_current_3
     unit_of_measurement: "A"
     min_value: 0
@@ -163,7 +163,7 @@ number:
 
   # Taper voltage 1 slider
   - platform: template
-    name: "YAMBMS ${yambms_id} Taper Voltage 1"
+    name: "YamBMS Taper Voltage 1"
     id: yambms${yambms_id}_taper_voltage_1
     unit_of_measurement: "V"
     min_value: 40
@@ -175,7 +175,7 @@ number:
 
   # Taper voltage 2 slider
   - platform: template
-    name: "YAMBMS ${yambms_id} Taper Voltage 2"
+    name: "YamBMS Taper Voltage 2"
     id: yambms${yambms_id}_taper_voltage_2
     unit_of_measurement: "V"
     min_value: 40
@@ -187,7 +187,7 @@ number:
 
   # Taper voltage 3 slider
   - platform: template
-    name: "YAMBMS ${yambms_id} Taper Voltage 3"
+    name: "YamBMS Taper Voltage 3"
     id: yambms${yambms_id}_taper_voltage_3
     unit_of_measurement: "V"
     min_value: 40
