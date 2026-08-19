@@ -7,9 +7,8 @@
 #
 # When charging leaves "Bulk" mode, the slider value is restored.
 #
-# IMPORTANT: Internal IDs use yambms${yambms_id} (NO underscore),
-# matching your existing config (e.g. yambms1_max_requested_charge_current).
-# ESPHome auto-generates the HA entity name yambms_1_... from these.
+# NOTE: Internal IDs (defined in this file) use the "yambms" prefix.
+# External references (defined in other files) keep yambms${yambms_id}.
 # ============================================================
 
 substitutions:
@@ -25,19 +24,19 @@ substitutions:
 
 globals:
   # Stores the user's original slider value so we can restore it
-  - id: yambms${yambms_id}_original_charge_current
+  - id: yambms_original_charge_current
     type: float
     restore_value: no
     initial_value: "0.0"
 
   # Flag to remember we are currently in a tapered state
-  - id: yambms${yambms_id}_taper_active
+  - id: yambms_taper_active
     type: bool
     restore_value: no
     initial_value: "false"
 
   # Stores the currently applied (target) current for display/debugging
-  - id: yambms${yambms_id}_applied_charge_current
+  - id: yambms_applied_charge_current
     type: float
     restore_value: no
     initial_value: "0.0"
@@ -49,32 +48,32 @@ sensor:
   # Shows the current target current being applied by the taper logic
   - platform: template
     name: "YamBMS Taper Applied Current"
-    id: yambms1_taper_applied_current
+    id: yambms_taper_applied_current
     unit_of_measurement: "A"
     accuracy_decimals: 1
     update_interval: 3s
     lambda: |-
-      return id(yambms${yambms_id}_applied_charge_current);
+      return id(yambms_applied_charge_current);
 
   # Shows the original (user-set) charge current before tapering
   - platform: template
     name: "YamBMS Taper Original Current"
-    id: yambms1_taper_original_current
+    id: yambms_taper_original_current
     unit_of_measurement: "A"
     accuracy_decimals: 1
     update_interval: 3s
     lambda: |-
-      return id(yambms${yambms_id}_original_charge_current);
+      return id(yambms_original_charge_current);
 
   # Shows whether the taper is currently active (1 = active, 0 = inactive)
   - platform: template
     name: "YamBMS Taper Active"
-    id: yambms1_taper_active_sensor
+    id: yambms_taper_active_sensor
     unit_of_measurement: ""
     accuracy_decimals: 0
     update_interval: 3s
     lambda: |-
-      return id(yambms${yambms_id}_taper_active) ? 1.0 : 0.0;
+      return id(yambms_taper_active) ? 1.0 : 0.0;
 
 
 # ============================================================
@@ -83,7 +82,7 @@ sensor:
 switch:
   - platform: template
     name: "YamBMS Charge Taper Enabled"
-    id: yambms${yambms_id}_charge_taper_enabled
+    id: yambms_charge_taper_enabled
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
     turn_on_action:
@@ -93,13 +92,13 @@ switch:
       then:
         # When disabled, restore the original slider value if we were tapering
         - lambda: |-
-            if (id(yambms${yambms_id}_taper_active)) {
+            if (id(yambms_taper_active)) {
               auto *charge_number = id(yambms${yambms_id}_max_requested_charge_current);
-              float original = id(yambms${yambms_id}_original_charge_current);
+              float original = id(yambms_original_charge_current);
               if (fabs(charge_number->state - original) > 0.01) {
                 charge_number->publish_state(original);
               }
-              id(yambms${yambms_id}_taper_active) = false;
+              id(yambms_taper_active) = false;
             }
         - logger.log: "YAMBMS charge taper DISABLED"
 
@@ -123,12 +122,12 @@ number:
   #   set_action:
   #     then:
   #       - lambda: |-
-  #           id(yambms${yambms_id}_original_charge_current) = x;
+  #           id(yambms_original_charge_current) = x;
 
   # Taper current 1 slider
   - platform: template
     name: "YamBMS Taper Current 1"
-    id: yambms${yambms_id}_taper_current_1
+    id: yambms_taper_current_1
     unit_of_measurement: "A"
     min_value: 0
     max_value: 100
@@ -140,7 +139,7 @@ number:
   # Taper current 2 slider
   - platform: template
     name: "YamBMS Taper Current 2"
-    id: yambms${yambms_id}_taper_current_2
+    id: yambms_taper_current_2
     unit_of_measurement: "A"
     min_value: 0
     max_value: 100
@@ -152,7 +151,7 @@ number:
   # Taper current 3 slider
   - platform: template
     name: "YamBMS Taper Current 3"
-    id: yambms${yambms_id}_taper_current_3
+    id: yambms_taper_current_3
     unit_of_measurement: "A"
     min_value: 0
     max_value: 100
@@ -164,7 +163,7 @@ number:
   # Taper voltage 1 slider
   - platform: template
     name: "YamBMS Taper Voltage 1"
-    id: yambms${yambms_id}_taper_voltage_1
+    id: yambms_taper_voltage_1
     unit_of_measurement: "V"
     min_value: 40
     max_value: 60
@@ -176,7 +175,7 @@ number:
   # Taper voltage 2 slider
   - platform: template
     name: "YamBMS Taper Voltage 2"
-    id: yambms${yambms_id}_taper_voltage_2
+    id: yambms_taper_voltage_2
     unit_of_measurement: "V"
     min_value: 40
     max_value: 60
@@ -188,7 +187,7 @@ number:
   # Taper voltage 3 slider
   - platform: template
     name: "YamBMS Taper Voltage 3"
-    id: yambms${yambms_id}_taper_voltage_3
+    id: yambms_taper_voltage_3
     unit_of_measurement: "V"
     min_value: 40
     max_value: 60
@@ -205,7 +204,7 @@ interval:
     then:
       - lambda: |-
           // If the taper logic is disabled, do nothing
-          if (!id(yambms${yambms_id}_charge_taper_enabled).state) {
+          if (!id(yambms_charge_taper_enabled).state) {
             return;
           }
 
@@ -216,14 +215,14 @@ interval:
           float voltage = id(yambms${yambms_id}_total_voltage).state;
 
           // Get the taper thresholds from the sliders
-          float v1 = id(yambms${yambms_id}_taper_voltage_1).state;
-          float v2 = id(yambms${yambms_id}_taper_voltage_2).state;
-          float v3 = id(yambms${yambms_id}_taper_voltage_3).state;
+          float v1 = id(yambms_taper_voltage_1).state;
+          float v2 = id(yambms_taper_voltage_2).state;
+          float v3 = id(yambms_taper_voltage_3).state;
 
           // Get the taper currents from the sliders
-          float c1 = id(yambms${yambms_id}_taper_current_1).state;
-          float c2 = id(yambms${yambms_id}_taper_current_2).state;
-          float c3 = id(yambms${yambms_id}_taper_current_3).state;
+          float c1 = id(yambms_taper_current_1).state;
+          float c2 = id(yambms_taper_current_2).state;
+          float c3 = id(yambms_taper_current_3).state;
 
           // Reference to the main charge current number
           auto *charge_number = id(yambms${yambms_id}_max_requested_charge_current);
@@ -231,14 +230,14 @@ interval:
           // --- If we are in Bulk charging mode ---
           if (charging_instruction == "Bulk") {
             // If we are not already in a tapered state, remember the original slider value
-            if (!id(yambms${yambms_id}_taper_active)) {
-              id(yambms${yambms_id}_original_charge_current) = charge_number->state;
-              id(yambms${yambms_id}_taper_active) = true;
+            if (!id(yambms_taper_active)) {
+              id(yambms_original_charge_current) = charge_number->state;
+              id(yambms_taper_active) = true;
             }
 
             // Use the ORIGINAL (user-set) value as the baseline, not the
             // current slider state (which may already be tapered down).
-            float baseline = id(yambms${yambms_id}_original_charge_current);
+            float baseline = id(yambms_original_charge_current);
 
             // Determine the target current based on voltage
             float target_current = baseline;  // default: keep original slider value
@@ -252,7 +251,7 @@ interval:
             }
 
             // Store the applied current for the display sensor
-            id(yambms${yambms_id}_applied_charge_current) = target_current;
+            id(yambms_applied_charge_current) = target_current;
 
             // Apply the target current (only if it differs to avoid spamming)
             if (fabs(charge_number->state - target_current) > 0.01) {
@@ -262,14 +261,14 @@ interval:
           // --- If we are NOT in Bulk mode anymore ---
           else {
             // If we were previously tapering, restore the original slider value
-            if (id(yambms${yambms_id}_taper_active)) {
-              float original = id(yambms${yambms_id}_original_charge_current);
+            if (id(yambms_taper_active)) {
+              float original = id(yambms_original_charge_current);
               if (fabs(charge_number->state - original) > 0.01) {
                 charge_number->publish_state(original);
               }
-              id(yambms${yambms_id}_taper_active) = false;
+              id(yambms_taper_active) = false;
             }
 
             // When not in Bulk, the applied current equals the slider value
-            id(yambms${yambms_id}_applied_charge_current) = charge_number->state;
+            id(yambms_applied_charge_current) = charge_number->state;
           }
