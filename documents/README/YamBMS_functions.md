@@ -89,6 +89,22 @@ This result can then be **further reduced** by the active functions acting on th
 
 The final CCL/DCL sent to the inverter is always the **lowest** value among all these functions. The **CCL/DCL derating reason** sensor shows which function is currently limiting the current.
 
+### Multi-inverter / multi-charger
+
+`YamBMS` supports several inverters/chargers connected to the same battery bank. Each inverter/charger declared in your YAML has its own `CAN` or `RS485` package, and each one receives **the same** `Requested Charge/Discharge Current`.
+
+To prevent the battery bank from being charged/discharged at `N` times the calculated limit, `YamBMS` **divides the CCL and DCL by the number of declared inverter/charger interfaces** :
+
+> Example : a CCL of `150 A` with `2` inverters declared → each inverter receives `75 A`
+
+Each declared `yambms_canbus.yaml` / `yambms_rs485_pylon.yaml` package increments an interface counter at boot, and the final CCL/DCL is divided by this counter, then rounded. The division is applied **after** all the limiting functions above, so it always applies to the final value.
+
+> [!NOTE]
+> The counter is only incremented by the inverter/charger packages. A node with no inverter link declared keeps a divider of `1`, so the CCL/DCL are left unchanged.
+
+> [!IMPORTANT]
+> The division assumes your inverters/chargers **share the load evenly**. This is the case for identical units working in parallel on the same bank. If your units have different power ratings, or if one of them is offline, the total current drawn from the battery will be lower than the calculated limit — never higher.
+
 ## Requested Values
 
 ![Image](../../images/YamBMS_Requested_Values.png "YamBMS_Requested_Values")
@@ -224,6 +240,9 @@ default allows 0.5C from -20°C up to 55°C, with a cut-off below -30°C and abo
 
 > [!IMPORTANT]
 > In Bulk, the `Auto CVL` function uses the `Balance Trig. Volt.` value of your BMS. `e.g. for LFP` : BTG=0.010V
+
+> [!NOTE]
+> `Auto CVL` was reworked in `YamBMS 1.8.0` by [@Sleeper85](https://github.com/Sleeper85), see [release note](changelog/Changelog_YamBMS_1.8.0_Auto_CVL.md).
 
 When enabled, the `Automatic Charge Voltage Limit` function automatically reduces the
 `Requested Charge Voltage (CVL)` sent to the inverter when a cell starts to exceed the `Bulk
@@ -413,23 +432,6 @@ Afterwards the battery is then discharged, however `Requested Charge Current (CC
 `Auto SoC Limit` - `Auto SoC Hysteresis` = `80%` - `5%` = `75%`. Without this, the `SoC` would oscillate between
 `79%` and `80%`, stressing components unnecessary.
 
-
-## Inverter Heartbeat Monitoring
-
-![Image](../../images/YamBMS_Inverter_Heartbeat.png "YamBMS_Inverter_Heartbeat")
-
-This feature allows you to monitor the heartbeat of your inverter (time between two ACK 0x305). This is useful for troubleshooting purposes and should not remain enabled continuously.
-
-This heartbeat must be regular and depends on the selected `CAN protocol` and the behavior of the inverter. If the heartbeat is not regular this can show a problem on the inverter side or an overloaded ESP32.
-
-The `Deye` inverter sends an ACK `0x305` in response to the reception of a CAN frame `0x356`. Knowing that CAN frames are sent every `100ms` and that the CAN protocol `PYLON 1.2` has 6 CAN frames, the heartbeat of the `Deye` inverter is `600ms`.
-
-> [!IMPORTANT]  
-> Every `2h` Deye takes more than `3s` to respond and more than `5s` at midnight.
-> This is what the `CANBUS Status` looks like when the `canbus_link_timer` is set to `3s`.
-
-![Image](../../images/YamBMS_CANBUS_Status.png "YamBMS_CANBUS_Status")
-
 ## Auto CCL Current Taper
 
 Optional Auto CCL package (`yambms_auto_ccl_current_taper.yaml`).
@@ -478,6 +480,22 @@ Notes:
 - Can run alongside other Auto CCL functions; the pipeline takes the most restrictive reduction.
 - If you taper toward near zero, you may also need a higher cut-off voltage or a longer cut-off timer to avoid an early `Cut-Off`.
 - Pair with `Charger Offset V.` when the inverter undershoots bulk.
+
+## Inverter Heartbeat Monitoring
+
+![Image](../../images/YamBMS_Inverter_Heartbeat.png "YamBMS_Inverter_Heartbeat")
+
+This feature allows you to monitor the heartbeat of your inverter (time between two ACK 0x305). This is useful for troubleshooting purposes and should not remain enabled continuously.
+
+This heartbeat must be regular and depends on the selected `CAN protocol` and the behavior of the inverter. If the heartbeat is not regular this can show a problem on the inverter side or an overloaded ESP32.
+
+The `Deye` inverter sends an ACK `0x305` in response to the reception of a CAN frame `0x356`. Knowing that CAN frames are sent every `100ms` and that the CAN protocol `PYLON 1.2` has 6 CAN frames, the heartbeat of the `Deye` inverter is `600ms`.
+
+> [!IMPORTANT]  
+> Every `2h` Deye takes more than `3s` to respond and more than `5s` at midnight.
+> This is what the `CANBUS Status` looks like when the `canbus_link_timer` is set to `3s`.
+
+![Image](../../images/YamBMS_CANBUS_Status.png "YamBMS_CANBUS_Status")
 
 ## Diagnostic
 

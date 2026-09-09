@@ -1,5 +1,5 @@
-# Updated : 2026.08.28
-# Version : 1.8.0
+# Updated : 2026.08.27
+# Version : 1.1.0
 # GitHub  : https://github.com/Sleeper85/esphome-yambms
 
 # YamBMS ( Yet another multi-BMS Merging Solution )
@@ -17,15 +17,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/gpl.html>.
 
-substitutions:
-  yambms_version: "1.8.0"
+# LED DevKitC-1 V1.0 = 48 / V1.1 = 38
 
-esphome:
-  name: ${hostname}
-  friendly_name: ${friendly_name}
-  # comment: 'Solar system braining and more !'
-  # area: 'Technical local'
-  project:
-    name: Sleeper85.YamBMS
-    version: ${yambms_version}
-  min_version: 2026.8.0
+substitutions:
+  # canbus_esp32_can
+  tx_pin_4: '38'
+  rx_pin_4: '39'
+  # RGB LED
+  rgb_led_pin: '48' 
+
+packages:
+  pvbrain2: !include board_ESP32-S3_DevKitC-1_PVbrain2.yaml

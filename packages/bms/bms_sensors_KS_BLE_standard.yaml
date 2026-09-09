@@ -1,6 +1,6 @@
 # Updated : 2026.08.26
-# Version : 1.3.9
-# GitHub  : https://github.com/syssi/esphome-jk-bms
+# Version : 1.1.0
+# GitHub  : https://github.com/syssi/esphome-ks-bms
 
 # YamBMS ( Yet another multi-BMS Merging Solution )
 
@@ -19,9 +19,19 @@
 
 packages:
   bms_base: !include bms_base.yaml
-  bms_temperature_sensor: !include bms_temperature_sensor_2.yaml
-  bms_errors_bitmask: !include bms_errors_bitmask_JK_BLE.yaml
-  bms_battery_soh: !include bms_base_battery_soh.yaml
+  bms_temperature_sensor: !include bms_temperature_sensor_4.yaml
+  bms_errors_bitmask: !include bms_errors_bitmask_KS_BLE.yaml
+
+substitutions:
+  # KS BMS device type : selects the status command the component polls with,
+  # 0x01 for type 1 and 0x61 for type 2. Everything else (UUIDs, frame decoding,
+  # scaling) is identical.
+  #   1 = default, KS48100 and KS48300-Ho23
+  #   2 = KS48200-Ho21_V2
+  # Wrong value : the settings and identification frames still answer, so the
+  # numbers and text sensors fill in, but every status sensor stays empty and
+  # 'Can be combined' never turns on.
+  bms_ks_device_type: '1'
 
 ota:
   on_begin:
@@ -34,46 +44,30 @@ ota:
 # +--------------------------------------+
 
 external_components:
-  - source: github://syssi/esphome-jk-bms@main
+  - source: github://syssi/esphome-ks-bms@main
     refresh: 0s
 
 esp32_ble_tracker:
   scan_parameters:
     active: false
-  # on_ble_advertise:
-  #   then:
-  #     - lambda: |-
-  #         if (x.get_name().rfind("JK-", 0) == 0 || x.get_name().rfind("JK_", 0) == 0) {
-  #           ESP_LOGI("ble_adv", "New JK-BMS found");
-  #           ESP_LOGI("ble_adv", "  Name: %s", x.get_name().c_str());
-  #           ESP_LOGI("ble_adv", "  MAC address: %s", x.address_str().c_str());
-  #           ESP_LOGD("ble_adv", "  Advertised service UUIDs:");
-  #           for (auto uuid : x.get_service_uuids()) {
-  #             ESP_LOGD("ble_adv", "    - %s", uuid.to_string().c_str());
-  #           }
-  #         }
 
 ble_client:
   - id: ble_client${bms_id}
     mac_address: ${bms_ble_mac_address}
 
-jk_bms_ble:
-  - ble_client_id: ble_client${bms_id}
-    protocol_version: ${bms_ble_protocol_version}
-    throttle: ${bms_update_interval}
-    id: jk_bms_ble${bms_id}
+ks_bms_ble:
+  - id: ks_bms_ble${bms_id}
+    ble_client_id: ble_client${bms_id}
+    device_type: ${bms_ks_device_type}
+    update_interval: ${bms_update_interval}
 
 # +--------------------------------------+
 # | Component entities                   |
 # +--------------------------------------+
 
 binary_sensor:
-  - platform: jk_bms_ble
-    jk_bms_ble_id: jk_bms_ble${bms_id}
-    balancing:
-      id: bms${bms_id}_bms_equalizing
-      device_id: bms_${bms_id}
-      # name: "balancing"
+  - platform: ks_bms_ble
+    ks_bms_ble_id: ks_bms_ble${bms_id}
     charging:
       id: bms${bms_id}_charging_allowed
       device_id: bms_${bms_id}
@@ -82,6 +76,9 @@ binary_sensor:
       id: bms${bms_id}_discharging_allowed
       device_id: bms_${bms_id}
       name: "discharging"
+    limiting_current:
+      device_id: bms_${bms_id}
+      name: "limiting current"
     online_status:
       id: bms${bms_id}_online_status
       device_id: bms_${bms_id}
@@ -93,9 +90,17 @@ binary_sensor:
               // Pass the current state to the update function
               id(global_update_fault)(${CAT_BMS}, ${bms_id}, !x);
 
+  # Required sensors cannot be retrieved from BMS
+  # equalizing : the KS BMS only reports which cells are being balanced
+  # Internal : only specifying an id without a name will implicitly set this to true.
+  - platform: template
+    id: bms${bms_id}_bms_equalizing
+    device_id: bms_${bms_id}
+    lambda: return (id(bms${bms_id}_balanced_cell_bitmask).state > 0);
+
 switch:
-  - platform: jk_bms_ble
-    jk_bms_ble_id: jk_bms_ble${bms_id}
+  - platform: ks_bms_ble
+    ks_bms_ble_id: ks_bms_ble${bms_id}
     charging:
       id: bms${bms_id}_charge_switch
       device_id: bms_${bms_id}
@@ -104,10 +109,6 @@ switch:
       id: bms${bms_id}_discharge_switch
       device_id: bms_${bms_id}
       name: "Discharge switch"
-    balancer:
-      id: bms${bms_id}_balance_switch
-      device_id: bms_${bms_id}
-      name: "Balance switch"
     # +--------------------------------------+
   - platform: ble_client
     ble_client_id: ble_client${bms_id}
@@ -117,8 +118,8 @@ switch:
     # +--------------------------------------+
 
 sensor:
-  - platform: jk_bms_ble
-    jk_bms_ble_id: jk_bms_ble${bms_id}
+  - platform: ks_bms_ble
+    ks_bms_ble_id: ks_bms_ble${bms_id}
     min_cell_voltage:
       id: bms${bms_id}_min_cell_voltage
       device_id: bms_${bms_id}
@@ -166,18 +167,36 @@ sensor:
     mosfet_temperature:
       device_id: bms_${bms_id}
       name: "mosfet temperature"
-    temperature_sensor_1:
+    ambient_temperature:
+      device_id: bms_${bms_id}
+      name: "ambient temperature"
+    average_temperature:
+      device_id: bms_${bms_id}
+      name: "average temperature"
+    temperature_1:
       id: bms${bms_id}_temperature_sensor_1
       device_id: bms_${bms_id}
       name: "temperature sensor 1"
-    temperature_sensor_2:
+    temperature_2:
       id: bms${bms_id}_temperature_sensor_2
       device_id: bms_${bms_id}
       name: "temperature sensor 2"
+    temperature_3:
+      id: bms${bms_id}_temperature_sensor_3
+      device_id: bms_${bms_id}
+      name: "temperature sensor 3"
+    temperature_4:
+      id: bms${bms_id}_temperature_sensor_4
+      device_id: bms_${bms_id}
+      name: "temperature sensor 4"
     state_of_charge:
       id: bms${bms_id}_state_of_charge
       device_id: bms_${bms_id}
       # name: "state of charge"
+    state_of_health:
+      id: bms${bms_id}_battery_soh
+      device_id: bms_${bms_id}
+      name: "Battery SoH"
     capacity_remaining:
       id: bms${bms_id}_capacity_remaining_ah
       device_id: bms_${bms_id}
@@ -186,17 +205,33 @@ sensor:
       id: bms${bms_id}_battery_capacity
       device_id: bms_${bms_id}
       name: "full charge capacity"
+    nominal_capacity:
+      device_id: bms_${bms_id}
+      name: "nominal capacity"
     charging_cycles:
       id: bms${bms_id}_charging_cycles_raw
       device_id: bms_${bms_id}
       # name: "charging cycles"
-    total_charging_cycle_capacity:
-      id: bms${bms_id}_cycle_capacity_raw
+    balanced_cell:
       device_id: bms_${bms_id}
-      # name: "total charging cycle capacity"
-    balancing_current:
+      name: "balanced cell"
+    balanced_cell_bitmask:
+      id: bms${bms_id}_balanced_cell_bitmask
       device_id: bms_${bms_id}
-      name: "balancing current"
+      name: "balanced cell bitmask"
+    error_bitmask:
+      id: bms${bms_id}_errors_bitmask
+      device_id: bms_${bms_id}
+      name: "errors bitmask"
+    voltage_protection_bitmask:
+      device_id: bms_${bms_id}
+      name: "voltage protection bitmask"
+    current_protection_bitmask:
+      device_id: bms_${bms_id}
+      name: "current protection bitmask"
+    temperature_protection_bitmask:
+      device_id: bms_${bms_id}
+      name: "temperature protection bitmask"
     cell_voltage_1:
       id: bms${bms_id}_cell_v_01
       device_id: bms_${bms_id}
@@ -261,154 +296,131 @@ sensor:
       id: bms${bms_id}_cell_v_16
       device_id: bms_${bms_id}
       name: "cell voltage 16"
-    cell_resistance_1:
+
+  # Charging cycle capacity - Calculated from charging cycles and battery capacity
+  - platform: template
+    id: bms${bms_id}_cycle_capacity_raw
+    device_id: bms_${bms_id}
+    # name: "charging cycle capacity"
+    update_interval: ${bms_update_interval}
+    unit_of_measurement: Ah
+    state_class: total
+    icon: mdi:car-battery
+    accuracy_decimals: 0
+    filters:
+      - or:
+        - throttle: 10s
+        - delta: 1
+    lambda: return id(bms${bms_id}_charging_cycles_raw).state * id(bms${bms_id}_battery_capacity).state;
+
+number:
+  - platform: ks_bms_ble
+    ks_bms_ble_id: ks_bms_ble${bms_id}
+    cell_overvoltage_protection:
+      id: bms${bms_id}_cell_ovp
       device_id: bms_${bms_id}
-      name: "cell resistance 01"
-    cell_resistance_2:
+      name: "cell voltage overvoltage protection"
+    cell_overvoltage_recovery:
+      id: bms${bms_id}_cell_ovpr
       device_id: bms_${bms_id}
-      name: "cell resistance 02"
-    cell_resistance_3:
+      name: "cell voltage overvoltage recovery"
+    cell_undervoltage_protection:
+      id: bms${bms_id}_cell_uvp
       device_id: bms_${bms_id}
-      name: "cell resistance 03"
-    cell_resistance_4:
+      name: "cell voltage undervoltage protection"
+    cell_undervoltage_recovery:
+      id: bms${bms_id}_cell_uvpr
       device_id: bms_${bms_id}
-      name: "cell resistance 04"
-    cell_resistance_5:
+      name: "cell voltage undervoltage recovery"
+    balance_open_voltage:
+      id: bms${bms_id}_balance_starting_voltage
       device_id: bms_${bms_id}
-      name: "cell resistance 05"
-    cell_resistance_6:
+      name: "balancing start voltage"
+    balance_open_voltage_diff:
+      id: bms${bms_id}_bms_balance_trigger_voltage
       device_id: bms_${bms_id}
-      name: "cell resistance 06"
-    cell_resistance_7:
+      # name: "balance trigger voltage"
+    cell_full_voltage:
       device_id: bms_${bms_id}
-      name: "cell resistance 07"
-    cell_resistance_8:
+      name: "cell full voltage"
+    cell_cutoff_voltage:
       device_id: bms_${bms_id}
-      name: "cell resistance 08"
-    cell_resistance_9:
+      name: "cell cutoff voltage"
+    nominal_capacity:
       device_id: bms_${bms_id}
-      name: "cell resistance 09"
-    cell_resistance_10:
+      name: "nominal capacity setting"
+    full_charge_capacity:
       device_id: bms_${bms_id}
-      name: "cell resistance 10"
-    cell_resistance_11:
+      name: "full charge capacity setting"
+    # The KS BMS has no dedicated charge / discharge current limit setting,
+    # its overcurrent protection thresholds are what YamBMS reads as the
+    # maximum charge and discharge currents of the pack.
+    charge_overcurrent_protection:
+      id: bms${bms_id}_max_charge_current
       device_id: bms_${bms_id}
-      name: "cell resistance 11"
-    cell_resistance_12:
+      name: "max charge current"
+    discharge_overcurrent_protection:
+      id: bms${bms_id}_max_discharge_current
       device_id: bms_${bms_id}
-      name: "cell resistance 12"
-    cell_resistance_13:
+      name: "max discharge current"
+    charge_overtemperature_protection:
       device_id: bms_${bms_id}
-      name: "cell resistance 13"
-    cell_resistance_14:
+      name: "charge overtemperature protection"
+    charge_overtemperature_recovery:
       device_id: bms_${bms_id}
-      name: "cell resistance 14"
-    cell_resistance_15:
+      name: "charge overtemperature recovery"
+    charge_undertemperature_protection:
       device_id: bms_${bms_id}
-      name: "cell resistance 15"
-    cell_resistance_16:
+      name: "charge undertemperature protection"
+    charge_undertemperature_recovery:
       device_id: bms_${bms_id}
-      name: "cell resistance 16"
+      name: "charge undertemperature recovery"
+    discharge_overtemperature_protection:
+      device_id: bms_${bms_id}
+      name: "discharge overtemperature protection"
+    discharge_overtemperature_recovery:
+      device_id: bms_${bms_id}
+      name: "discharge overtemperature recovery"
+    discharge_undertemperature_protection:
+      device_id: bms_${bms_id}
+      name: "discharge undertemperature protection"
+    discharge_undertemperature_recovery:
+      device_id: bms_${bms_id}
+      name: "discharge undertemperature recovery"
 
 text_sensor:
-  - platform: jk_bms_ble
-    jk_bms_ble_id: jk_bms_ble${bms_id}
+  - platform: ks_bms_ble
+    ks_bms_ble_id: ks_bms_ble${bms_id}
     errors:
       device_id: bms_${bms_id}
       name: "errors"
-    errors_bitmask_hex:
-      id: bms${bms_id}_errors_bitmask_hex
+    voltage_protection:
       device_id: bms_${bms_id}
-      name: "errors bitmask hex"
+      name: "voltage protection"
+    current_protection:
+      device_id: bms_${bms_id}
+      name: "current protection"
+    temperature_protection:
+      device_id: bms_${bms_id}
+      name: "temperature protection"
     balancer_status:
       device_id: bms_${bms_id}
       name: "balancer status"
-    total_runtime_formatted:
+    # The BLE advertised name identifies the bluetooth module, not the BMS.
+    # 'model type' and 'device model' are what tell you which pack you have,
+    # and so whether bms_ks_device_type should be 1 or 2.
+    device_model:
       device_id: bms_${bms_id}
-      name: "total runtime formatted"
+      name: "device model"
+    model_type:
+      device_id: bms_${bms_id}
+      name: "model type"
+    serial_number:
+      device_id: bms_${bms_id}
+      name: "serial number"
     software_version:
       device_id: bms_${bms_id}
       name: "software version"
     hardware_version:
       device_id: bms_${bms_id}
       name: "hardware version"
-
-number:
-  - platform: jk_bms_ble
-    jk_bms_ble_id: jk_bms_ble${bms_id}
-    cell_count:
-      id: bms${bms_id}_cell_count
-      device_id: bms_${bms_id}
-      name: "cell count"
-    total_battery_capacity:
-      device_id: bms_${bms_id}
-      name: "total battery capacity"
-    cell_voltage_overvoltage_protection:
-      id: bms${bms_id}_cell_ovp
-      device_id: bms_${bms_id}
-      name: "cell voltage overvoltage protection"
-    cell_voltage_overvoltage_recovery:
-      id: bms${bms_id}_cell_ovpr
-      device_id: bms_${bms_id}
-      name: "cell voltage overvoltage recovery"
-    cell_voltage_undervoltage_protection:
-      id: bms${bms_id}_cell_uvp
-      device_id: bms_${bms_id}
-      name: "cell voltage undervoltage protection"
-    cell_voltage_undervoltage_recovery:
-      id: bms${bms_id}_cell_uvpr
-      device_id: bms_${bms_id}
-      name: "cell voltage undervoltage recovery"
-    max_charge_current:
-      id: bms${bms_id}_max_charge_current
-      device_id: bms_${bms_id}
-      name: "max charge current"
-    max_discharge_current:
-      id: bms${bms_id}_max_discharge_current
-      device_id: bms_${bms_id}
-      name: "max discharge current"
-    balancing_start_voltage:
-      id: bms${bms_id}_balance_starting_voltage
-      device_id: bms_${bms_id}
-      name: "balancing start voltage"
-    balance_trigger_voltage:
-      id: bms${bms_id}_bms_balance_trigger_voltage
-      device_id: bms_${bms_id}
-      # name: "balance trigger voltage"
-    # Added 2024.11.11
-    charge_overtemperature_protection:
-      device_id: bms_${bms_id}
-      name: "charge overtemperature protection"
-    charge_overtemperature_protection_recovery:
-      device_id: bms_${bms_id}
-      name: "charge overtemperature protection recovery"
-    discharge_overtemperature_protection:
-      device_id: bms_${bms_id}
-      name: "discharge overtemperature protection"
-    discharge_overtemperature_protection_recovery:
-      device_id: bms_${bms_id}
-      name: "discharge overtemperature protection recovery"
-    charge_undertemperature_protection:
-      device_id: bms_${bms_id}
-      name: "charge undertemperature protection"
-    charge_undertemperature_protection_recovery:
-      device_id: bms_${bms_id}
-      name: "charge undertemperature protection recovery"
-    mosfet_overtemperature_protection:
-      device_id: bms_${bms_id}
-      name: "mosfet overtemperature protection"
-    mosfet_overtemperature_protection_recovery:
-      device_id: bms_${bms_id}
-      name: "mosfet overtemperature protection recovery"
-
-button:
-  - platform: jk_bms_ble
-    jk_bms_ble_id: jk_bms_ble${bms_id}
-    retrieve_settings:
-      device_id: bms_${bms_id}
-      name: "retrieve settings"
-      entity_category: config
-    retrieve_device_info:
-      device_id: bms_${bms_id}
-      name: "retrieve device info"
-      entity_category: config
