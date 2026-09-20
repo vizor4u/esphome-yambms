@@ -259,9 +259,7 @@ interval:
             if (fabs(charge_number->state - target_current) > 0.01) {
               charge_number->publish_state(target_current);
             }
-          }
-          else if (!float_switch_on) {
-              charge_number->publish_state(c3);
+
           }
           else {
             // If we were previously tapering, restore the original slider value
