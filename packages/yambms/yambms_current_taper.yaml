@@ -258,10 +258,6 @@ interval:
               charge_number->publish_state(target_current);
             }
           }
-          // --- If we are NOT in Bulk mode anymore and charging_instruction is STOP  ---
-          else if (!id(yambms${yambms_id}_switch_float).state)
-              charge_number->publish_state(c3);
-          }
           else {
             // If we were previously tapering, restore the original slider value
             if (id(yambms_taper_active)) {
