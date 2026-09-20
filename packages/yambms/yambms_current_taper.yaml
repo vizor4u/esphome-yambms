@@ -208,14 +208,13 @@ interval:
             return;
           }
 
-          // Get the current charging instruction
+          // Get the current charging instruction & float switch state
           std::string charging_instruction = id(yambms${yambms_id}_charging_instruction).state;
           bool float_switch_on = id(yambms${yambms_id}_switch_float).state;
 
           // Get the current battery voltage
           float voltage = id(yambms${yambms_id}_total_voltage).state;
           
-
           // Get the taper thresholds from the sliders
           float v1 = id(yambms_taper_voltage_1).state;
           float v2 = id(yambms_taper_voltage_2).state;
@@ -229,7 +228,7 @@ interval:
           // Reference to the main charge current number
           auto *charge_number = id(yambms${yambms_id}_max_requested_charge_current);
 
-          // --- If we are in Bulk charging mode ---
+          // --- 1. If we are in Bulk charging mode ---
           if (charging_instruction == "Bulk") {
             // If we are not already in a tapered state, remember the original slider value
             if (!id(yambms_taper_active)) {
@@ -259,10 +258,25 @@ interval:
             if (fabs(charge_number->state - target_current) > 0.01) {
               charge_number->publish_state(target_current);
             }
-
           }
+          // --- 2. If NOT in Bulk, and Switch is OFF ---
+          else if (!float_switch_on) {
+            // Treat this as an override state to preserve the original slider value
+            if (!id(yambms_taper_active)) {
+              id(yambms_original_charge_current) = charge_number->state;
+              id(yambms_taper_active) = true;
+            }
+
+            float target_current = 0.0;
+            id(yambms_applied_charge_current) = target_current;
+
+            if (fabs(charge_number->state - target_current) > 0.01) {
+              charge_number->publish_state(target_current);
+            }
+          }
+          // --- 3. If NOT in Bulk, and Switch is ON ---
           else {
-            // If we were previously tapering, restore the original slider value
+            // If we were previously tapering (or forced to 0), restore the original slider value
             if (id(yambms_taper_active)) {
               float original = id(yambms_original_charge_current);
               if (fabs(charge_number->state - original) > 0.01) {
@@ -271,6 +285,6 @@ interval:
               id(yambms_taper_active) = false;
             }
 
-            // When not in Bulk, the applied current equals the slider value
+            // When not overriding, the applied current equals the slider value
             id(yambms_applied_charge_current) = charge_number->state;
           }
