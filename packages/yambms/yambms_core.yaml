@@ -1153,9 +1153,13 @@ interval:
               // Float
               else if (charging_instruction == "Float")
                 requested_charge_voltage = id(yambms${yambms_id}_float_voltage).state;
+              // if float is disabled = keep at bulk but don't go to float 
+              else if (!id(yambms${yambms_id}_switch_float).state)
+                requested_charge_voltage = id(yambms${yambms_id}_bulk_voltage).state;
               // Stop : keep at nominal voltage
               else
                 requested_charge_voltage = id(yambms${yambms_id}_var_cell_nominal_v) * ${yambms_cell_count};
+
 
               requested_charge_voltage += id(yambms${yambms_id}_charger_offset_v).state +
                                           id(yambms${yambms_id}_var_auto_cvl) +
