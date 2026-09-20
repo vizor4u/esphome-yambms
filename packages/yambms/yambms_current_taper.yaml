@@ -260,7 +260,7 @@ interval:
           }
           // --- If we are NOT in Bulk mode anymore and charging_instruction is STOP  ---
           else if (charging_instruction == "Stop") {
-            charge_number->publish_state(c3)
+            charge_number->publish_state(c3); 
           }
           else {
             // If we were previously tapering, restore the original slider value
