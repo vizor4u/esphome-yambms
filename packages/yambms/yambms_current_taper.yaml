@@ -259,7 +259,7 @@ interval:
             }
           }
           // --- If we are NOT in Bulk mode anymore and charging_instruction is STOP  ---
-          else if (!id(yambms${yambms_id}_switch_float).state)
+          else if ((!id(yambms${yambms_id}_switch_float).state)) 
             target_current = c3;
             charge_number->publish_state(target_current);
           }
